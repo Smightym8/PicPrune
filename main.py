@@ -30,6 +30,9 @@ def get_images_in_directory(directory):
     return images
 
 def remove_duplicate_images():
+    if not directory:
+        return
+    
     image_hashes = {}
 
     images = get_images_in_directory(directory)
