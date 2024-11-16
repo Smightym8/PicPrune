@@ -29,29 +29,63 @@ class App(customtkinter.CTk):
         self.filter_button = customtkinter.CTkButton(self, text="Filter images", command=self.process_images)
         self.filter_button.pack(padx=20, pady=20)
 
+        # Label to show the current operation
+        self.operation_label = customtkinter.CTkLabel(self, text="", font=("Ubuntu", 14))
+        self.operation_label.pack(pady=(20, 5))
+
+        # Progress bar for filtering
+        self.progress_label = customtkinter.CTkLabel(self, text="Progress: 0%", font=("Ubuntu", 12))
+        self.progress_label.pack(pady=(5, 5))
+
+        self.progress_bar = customtkinter.CTkProgressBar(self, orientation="horizontal", mode="determinate")
+        self.progress_bar.pack(padx=20, pady=20, fill="x")
+        self.progress_bar.set(0)  # Initialize progress to 0
+
+        # Error message label
+        self.error_label = customtkinter.CTkLabel(self, text="", font=("Ubuntu", 12), text_color="red")
+        self.error_label.pack(pady=10)
+
     def select_directory(self):
         self.directory = filedialog.askdirectory()
-        self.label2.configure(text=f"Selected directory: {self.directory}")
-        self.duplicates_directory = os.path.join(self.directory, "duplicates")
+        if self.directory:
+            self.error_label.configure(text="")  # Clear error message
+            self.label2.configure(text=f"Selected directory: {self.directory}")
+            self.duplicates_directory = os.path.join(self.directory, "duplicates")
+        else:
+            self.label2.configure(text="Selected directory: None")
 
     def process_images(self):
         if not self.directory:
-            print("No directory selected")
+            self.error_label.configure(text="Error: No directory selected!")  # Display error in red
             return
 
+        # Clear any previous error messages
+        self.error_label.configure(text="")
+
         print("Processing images")
+        self.operation_label.configure(text="Filtering duplicates...")
+        self.progress_label.configure(text="Progress: 0%")
+        self.progress_bar.set(0)
+
         self.filter_duplicate_images()
+
+        self.operation_label.configure(text="Filtering similar images...")
         self.filter_similar_images()
+
+        self.operation_label.configure(text="Finished processing images")
+        self.progress_label.configure(text="Progress: 100%")
+        self.progress_bar.set(1.0)
         print("Finished processing images")
 
     def filter_duplicate_images(self):
         image_hashes = {}
         images = self.get_images_in_directory()
+        total_images = len(images)
 
         if not os.path.exists(self.duplicates_directory):
             os.makedirs(self.duplicates_directory)
 
-        for img in images:
+        for idx, img in enumerate(images, start=1):
             hash = self.hash_file(img)
             if hash in image_hashes:
                 filename = os.path.basename(img)
@@ -60,21 +94,40 @@ class App(customtkinter.CTk):
             else:
                 image_hashes[hash] = img
 
+            # Update progress
+            progress = idx / total_images
+            self.progress_bar.set(progress)
+            self.progress_label.configure(text=f"Progress: {int(progress * 100)}%")
+            self.update_idletasks()  # Ensure UI updates in real-time
+
         if len(os.listdir(self.duplicates_directory)) == 0:
             os.rmdir(self.duplicates_directory)
 
     def filter_similar_images(self):
         image_names = self.get_images_in_directory()
+        if not image_names:
+            return
+
+        total_steps = len(image_names) + 1  # Encoding + Clustering
+        current_step = 0
+
+        # Load the model
         model = SentenceTransformer('clip-ViT-B-32')
+        current_step += 1
+        self.update_progress_bar(current_step, total_steps)
 
-        encoded_image = model.encode([Image.open(filepath) for filepath in image_names], batch_size=128,
-                                     convert_to_tensor=True, show_progress_bar=True)
+        # Encode the images
+        encoded_images = model.encode(
+            [Image.open(filepath) for filepath in image_names],
+            batch_size=128,
+            convert_to_tensor=True,
+            show_progress_bar=False  # Suppress internal progress bar
+        )
+        current_step += 1
+        self.update_progress_bar(current_step, total_steps)
 
-        # Now we run the clustering algorithm. This function compares images aganist
-        # all other images and returns a list with the pairs that have the highest
-        # cosine similarity score
-        processed_images = util.paraphrase_mining_embeddings(encoded_image)
-
+        # Perform paraphrase mining
+        processed_images = util.paraphrase_mining_embeddings(encoded_images)
         images_to_remove = [image for image in processed_images if image[0] >= 0.9]
 
         clusters = defaultdict(set)
@@ -102,6 +155,14 @@ class App(customtkinter.CTk):
                 img_path = image_names[img_id]
                 new_path = os.path.join(self.directory, f'{cluster_id}_{os.path.basename(img_path)}')
                 os.rename(img_path, new_path)
+
+        self.update_progress_bar(total_steps, total_steps)  # Ensure progress bar reaches 100%
+
+    def update_progress_bar(self, current_step, total_steps):
+        progress = current_step / total_steps
+        self.progress_bar.set(progress)
+        self.progress_label.configure(text=f"Progress: {int(progress * 100)}%")
+        self.update_idletasks()
 
     def get_images_in_directory(self):
         images = [os.path.join(self.directory, file) for file in os.listdir(self.directory) if
