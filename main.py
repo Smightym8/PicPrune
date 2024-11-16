@@ -13,36 +13,38 @@ class App(customtkinter.CTk):
         self.minsize(width=800, height=500)
         self.title("PicPrune")
 
+        self.title_font = customtkinter.CTkFont(family="Ubuntu", size=36)
+        self.standard_text_font = customtkinter.CTkFont(family="Ubuntu", size=14)
+        self.operation_font = customtkinter.CTkFont(family="Ubuntu", size=14)
+        self.error_font = customtkinter.CTkFont(family="Ubuntu", size=14)
+
         self.directory = None
         self.duplicates_directory = None
         self.image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp')
 
-        self.label = customtkinter.CTkLabel(self, text="PicPrune", font=("Ubuntu", 36))
+        self.label = customtkinter.CTkLabel(self, text="PicPrune", font=self.title_font)
         self.label.pack(padx=20, pady=20)
 
-        self.button = customtkinter.CTkButton(self, text="Select image directory", command=self.select_directory)
+        self.button = customtkinter.CTkButton(self, text="Select image directory", font=self.standard_text_font, command=self.select_directory)
         self.button.pack(padx=20, pady=20)
 
-        self.label2 = customtkinter.CTkLabel(self, text=f"Selected directory: {self.directory}", font=("Ubuntu", 12))
+        self.label2 = customtkinter.CTkLabel(self, text=f"Selected directory: {self.directory}", font=self.standard_text_font)
         self.label2.pack()
 
-        self.filter_button = customtkinter.CTkButton(self, text="Filter images", command=self.process_images)
+        self.filter_button = customtkinter.CTkButton(self, text="Filter images", font=self.standard_text_font, command=self.process_images)
         self.filter_button.pack(padx=20, pady=20)
 
-        # Label to show the current operation
-        self.operation_label = customtkinter.CTkLabel(self, text="", font=("Ubuntu", 14))
+        self.operation_label = customtkinter.CTkLabel(self, text="", font=self.operation_font)
         self.operation_label.pack(pady=(20, 5))
 
-        # Progress bar for filtering
-        self.progress_label = customtkinter.CTkLabel(self, text="Progress: 0%", font=("Ubuntu", 12))
+        self.progress_label = customtkinter.CTkLabel(self, text="Progress: 0%", font=self.standard_text_font)
         self.progress_label.pack(pady=(5, 5))
 
         self.progress_bar = customtkinter.CTkProgressBar(self, orientation="horizontal", mode="determinate")
         self.progress_bar.pack(padx=20, pady=20, fill="x")
         self.progress_bar.set(0)  # Initialize progress to 0
 
-        # Error message label
-        self.error_label = customtkinter.CTkLabel(self, text="", font=("Ubuntu", 12), text_color="red")
+        self.error_label = customtkinter.CTkLabel(self, text="", font=self.error_font, text_color="red")
         self.error_label.pack(pady=10)
 
     def select_directory(self):
