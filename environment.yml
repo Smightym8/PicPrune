@@ -2,4 +2,7 @@ name: PicPrune
 channels:
   - defaults
 dependencies:
+  - python=3.12
   - tk
+  - opencv
+  - scikit-image
