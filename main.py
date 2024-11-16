@@ -1,3 +1,4 @@
+from collections import defaultdict
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
@@ -11,7 +12,6 @@ SIMILARITIES_DIRECTORY_NAME = 'similarities'
 image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp')
 directory = None
 duplicates_directory = None
-similarities_directory = None
 
 def select_directory():
     global directory
@@ -24,6 +24,14 @@ def select_directory():
         duplicates_directory = os.path.join(directory, DUPLICATES_DIRECTORY_NAME)
         similarities_directory = os.path.join(directory, SIMILARITIES_DIRECTORY_NAME)
 
+def process_images():
+    if not directory:
+        return
+
+    move_duplicate_images()
+    move_similar_images()
+    print("Finished processing images")
+
 def hash_file(filename):
     with open(filename , "rb") as file:
         bytes = file.read()
@@ -31,7 +39,6 @@ def hash_file(filename):
         return filehash
 
 def get_images_in_directory(directory):
-    image_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.webp')
     images = [os.path.join(directory, file) for file in os.listdir(directory) if file.lower().endswith(image_extensions)]
     
     return images
@@ -58,13 +65,11 @@ def move_duplicate_images():
     
     if len(os.listdir(duplicates_directory)) == 0:
         os.rmdir(duplicates_directory)
-    
-    move_similar_images()
 
 def move_similar_images():
     if not directory:
         return
-    
+
     image_names = get_images_in_directory(directory)
     model = SentenceTransformer('clip-ViT-B-32')
 
@@ -75,12 +80,33 @@ def move_similar_images():
     # cosine similarity score
     processed_images = util.paraphrase_mining_embeddings(encoded_image)
 
-    #duplicates = [image for image in processed_images if image[0] >= 0.999]
-    for score, image_id1, image_id2 in processed_images:
-        print("\nScore: {:.3f}%".format(score * 100))
-        print(image_names[image_id1])
-        print(image_names[image_id2])
+    images_to_remove = [image for image in processed_images if image[0] >= 0.9]
 
+    clusters = defaultdict(set)
+
+    # Populate the clusters dictionary
+    for score, img1, img2 in images_to_remove:
+        clusters[img1].add(img1)
+        clusters[img1].add(img2)
+        clusters[img2].add(img1)
+        clusters[img2].add(img2)
+
+    # Merge clusters that have common elements
+    merged_clusters = []
+    for cluster in clusters.values():
+        for merged_cluster in merged_clusters:
+            if not cluster.isdisjoint(merged_cluster):
+                merged_cluster.update(cluster)
+                break
+        else:
+            merged_clusters.append(cluster)
+
+    # Prefix image names with the cluster id
+    for cluster_id, cluster in enumerate(merged_clusters, start=1):
+        for img_id in cluster:
+            img_path = image_names[img_id]
+            new_path = os.path.join(directory, f'{cluster_id}_{os.path.basename(img_path)}')
+            os.rename(img_path, new_path)
 
 
 root = Tk()
@@ -94,6 +120,6 @@ ttk.Button(frm, text="->", command=select_directory).grid(column=1, row=0)
 selected_dir_label = ttk.Label(frm, text="")
 selected_dir_label.grid(column=0, row=1, columnspan=2, sticky="nsew")
 
-ttk.Button(frm, text='Proceed', command=move_duplicate_images).grid(column=0, row=2, columnspan=2, sticky='nsew')
+ttk.Button(frm, text='Proceed', command=process_images).grid(column=0, row=2, columnspan=2, sticky='nsew')
 
 root.mainloop()
