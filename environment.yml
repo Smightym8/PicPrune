@@ -5,3 +5,5 @@ dependencies:
   - python=3.12
   - tk
   - conda-forge::sentence-transformers
+  - xorg-libx11
+  - customtkinter
